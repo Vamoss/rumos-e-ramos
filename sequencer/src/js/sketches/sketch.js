@@ -15,8 +15,7 @@ require('p5/lib/addons/p5.sound')
 
 import Tree from './tree';
 
-//const mqtt = require('mqtt');
-import mqtt from "precompiled-mqtt";
+import Multiuser from './multiuser';
 
 function sketch(p) {
     var tree;
@@ -28,45 +27,34 @@ function sketch(p) {
     var soundCounter = 0;
     const loopInFrames = 240;
     
-    var client;
-    const channel = "ramos";
+    var isServer;
+    var multiuser;
         
     p.setup = function() {
         var parent = this.canvas.parentElement;
         var renderer = p.createCanvas(parent.offsetWidth, parent.offsetHeight);
         graphics = p.createGraphics(p.width, p.height);
         tree = new Tree(p, graphics);
-        tree.addNew(0, p.width/2, p.height/2, null);
-        tree.on("pulse", onPulse.bind(this));
+        tree.on("add", onTreeAdd.bind(this));
+        tree.on("move", onTreeMove.bind(this));
+        tree.on("pulse", onTreePulse.bind(this));
 
+        multiuser = new Multiuser();
+        multiuser.on("start", onMultiuserStart.bind(this));
+        multiuser.on("add", onMultiuserAdd.bind(this));
+        multiuser.on("move", onMultiuserMove.bind(this));
+        multiuser.on("data", onMultiuserData.bind(this));
 
-        //*
-        tree.addRandom();
-        /**/
-
-
-        client = mqtt.connect("ws://participants:prp1nterac@34.172.96.169:9110")
-        
-        client.subscribe(channel, function (err) {
-            console.log("mqtt subscribed");
-             if(err) console.error(err);
-        })
-
-        client.on('connect', function (connack) {
-            console.log("mqtt connected", connack.sessionPresent)
-        })
-        
-        client.on('message', function (topic, message) {
-            console.log(topic, message.toString())
-        })
+        const queryString = window.location.search;
+        const urlParams = new URLSearchParams(queryString);
+        isServer = urlParams.get("server") === "1";
         
         if(useSound){
             for(var i = 0; i < maxSound; i++){
                 var osc = new p5.SinOsc();
-                var envelope = new p5.Env();
+                var envelope = new p5.Envelope();
                 envelope.setADSR(0.01, 1.0, 0.1, 0.5);
                 envelope.setRange(1, 0);
-                osc.start();
                 oscs.push(osc);
                 envelopes.push(envelope);
             }
@@ -83,7 +71,15 @@ function sketch(p) {
         }
     }
 
-    function onPulse(data){
+    function onTreeAdd(data){
+        multiuser.add(data.id, data.x, data.y, data.parent);
+    }
+
+    function onTreeMove(data){
+        multiuser.move(data.id, data.virtualX, data.virtualY);
+    }
+
+    function onTreePulse(data){
         const scale = [60, 62, 64, 66, 69, 70];//C, D, E, F♯, G, A, B♭
         var angle = 0;
         if(data.parent){
@@ -94,16 +90,43 @@ function sketch(p) {
         let midiValue = scale[note];
         let freqValue = p.midiToFreq(midiValue);
         
-        console.log("mqtt publish", freqValue.toString());
-        client.publish(channel, freqValue.toString());
+        if(isServer)
+            multiuser.publish(freqValue.toString());
 
         if(useSound){
             oscs[soundCounter].freq(freqValue);
+            oscs[soundCounter].start();
             envelopes[soundCounter].play(oscs[soundCounter], 0, 0.1);
             soundCounter++;
             if(soundCounter >= oscs.length)
                 soundCounter = 0;
         }
+    }
+
+    function onMultiuserStart(){
+        multiuser.add(0, p.width/2, p.height/2, null);
+        /*
+        var nodes = [0];
+        for(var i = 0; i < 20; i++){
+            var id = p.floor(p.random(1000));
+            multiuser.add(id, p.random(p.width), p.random(p.height), p.random(nodes));
+            nodes.push(id);
+        }
+        */
+    }
+
+    function onMultiuserAdd(data){
+        tree.addNew(data.id, data.x, data.y, data.parent);
+    }
+
+    function onMultiuserMove(data){
+        tree.updateNodePos(data.id, data.x, data.y);
+    }
+    function onMultiuserData(data){
+        data.forEach(d => {
+            tree.addNew(d.id, d.x, d.y, d.parent);
+        })
+        
     }
 
     p.mouseMoved = function(){

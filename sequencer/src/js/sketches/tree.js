@@ -1,9 +1,12 @@
 
 import Node from './node';
 import Branch from './branch';
+import EventDispatcher from './eventdispatcher';
 
-class Tree {
+class Tree extends EventDispatcher {
 	constructor(p5, canvas){
+        super();
+
         this.p5 = p5;
 		this.canvas = canvas;
 		
@@ -11,8 +14,7 @@ class Tree {
 		this.nodes = [];
 		this.branches = [];
 		
-		this.selected = null;
-		this._events = {};		
+		this.selected = null;	
 		
 		//pan
 		this.transX = 0
@@ -47,9 +49,11 @@ class Tree {
 		this.canvas.pop();
 	}
 	
-	addNew(id, x, y, parent){
+	addNew(id, x, y, parentId){
+        var parent = this.nodes.find(n => n.id == parentId);
 		var node = new Node(this.p5, id, x, y, parent, this.canvas);
 		node.on("pulse", this.onPulse.bind(this));
+		node.on("move", this.onMove.bind(this));
 		
 		this.nodes.push(node);
 		
@@ -67,11 +71,11 @@ class Tree {
         return node;
 	}
 
-    addRandom() {
-        var nodes = [this.root];
-        for(var i = 0; i < 20; i++){
-            var node = this.addNew(this.p5.floor(this.p5.random(1000)), this.p5.random(this.p5.width), this.p5.random(this.p5.height), this.p5.random(nodes));
-            nodes.push(node);
+    updateNodePos(id, x, y){
+        var node = this.nodes.find(n => n.id == id);
+        if(node){
+            node.pos.x = x;
+            node.pos.y = y;
         }
     }
 	
@@ -133,7 +137,12 @@ class Tree {
 		this.nodes.forEach(d => d.mousePressed(this.p5.mouseX-this.transX, this.p5.mouseY-this.transY));
 		this.draggingMap = !this.nodes.some(d => d.state == Node.STATES.PRESSED);
 		if(this.draggingMap && this.selected){
-			this.addNew(this.nodes.length, this.p5.mouseX - this.transX, this.p5.mouseY - this.transY, this.selected);
+            this.emit('add', {
+                id: this.p5.floor(this.p5.random(1000000)),
+                x: this.p5.mouseX - this.transX,
+                y: this.p5.mouseY - this.transY,
+                parent: this.selected.id
+            });
 			this.selected = null;
 		}
 	}
@@ -148,38 +157,17 @@ class Tree {
 	}
 	
 	pulse(){
-		this.root.pulse();
+        if(this.root)
+    		this.root.pulse();
 	}
 	
 	onPulse(data){
         this.emit('pulse', data);
-	}
+	}	
 	
-	//event emitter
-	on(name, listener) {
-        if (!this._events[name]) {
-            this._events[name] = [];
-        }
-        this._events[name].push(listener);
-    }
-	
-	removeListener(name, listenerToRemove) {
-        if (!this._events[name]) {
-            throw new Error(`Can't remove a listener. Event "${name}" doesn't exits.`);
-        }
-        const filterListeners = (listener) => listener !== listenerToRemove;
-        this._events[name] = this._events[name].filter(filterListeners);
-    }
-	
-    emit(name, data) {
-        if (!this._events[name]) {
-            throw new Error(`Can't emit an event. Event "${name}" doesn't exits.`);
-        }
-        const fireCallbacks = (callback) => {
-            callback(data);
-        };
-        this._events[name].forEach(fireCallbacks);
-    }
+	onMove(data){
+        this.emit('move', data);
+	}	
 }
 
 export default Tree;

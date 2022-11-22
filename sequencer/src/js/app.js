@@ -11,4 +11,10 @@ import './demo.js';
 /**
 * Start sketches
 */
-const p5Hero = new p5(sketch, 'hero');
+let btn = document.createElement("button");
+btn.innerHTML = "Começar";
+btn.onclick = function () {
+    document.body.removeChild(btn);
+    new p5(sketch, 'main');
+};
+document.body.appendChild(btn);

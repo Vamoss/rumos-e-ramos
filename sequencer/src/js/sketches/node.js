@@ -1,10 +1,13 @@
-class Node {
+import EventDispatcher from './eventdispatcher';
+class Node extends EventDispatcher {
 	static STATES = {FREE: 0, OVER: 1, PRESSED: 2};	
 	static MIN_RADIUS = 20;
 	static MAX_RADIUS = 80;
 	static PULSE_GROW = 10;
 	
 	constructor(p5, id, x, y, parent, canvas){
+        super();
+
         this.p5 = p5;
 		this.id = id;
 		this.pos = this.p5.createVector(x, y);
@@ -15,11 +18,9 @@ class Node {
 		
 		this.pulseRadius = 0;
 		this.pulsed = false;
-		
-		this._events = {};
 
 		this.children = [];
-		if(this.parent !== null){
+		if(this.parent){
 			this.color = this.p5.color(
 				this.p5.constrain(this.parent.color._getRed() + this.p5.random(-80, 80), 0, 255),
 				this.p5.constrain(this.parent.color._getGreen() + this.p5.random(-80, 80), 0, 255),
@@ -101,14 +102,17 @@ class Node {
 		if(distance < this.radius/2){
 			this.state = Node.STATES.PRESSED;
 			this.dragged = false;
+            this.virtualX = this.pos.x;
+            this.virtualY = this.pos.y;
 		}
 	}
 	
 	mouseDragged(x, y){
 		if(this.state == Node.STATES.PRESSED){
 			this.dragged = true;
-			this.pos.x += x;
-			this.pos.y += y;
+			this.virtualX += x;
+			this.virtualY += y;
+            this.emit('move', this);
 		}
 	}
 	
@@ -121,32 +125,6 @@ class Node {
 		this.pulsed = this.p5.frameCount;
 		this.emit('pulse', this);
 	}
-	
-	//event emitter
-	on(name, listener) {
-        if (!this._events[name]) {
-            this._events[name] = [];
-        }
-        this._events[name].push(listener);
-    }
-	
-	removeListener(name, listenerToRemove) {
-        if (!this._events[name]) {
-            throw new Error(`Can't remove a listener. Event "${name}" doesn't exits.`);
-        }
-        const filterListeners = (listener) => listener !== listenerToRemove;
-        this._events[name] = this._events[name].filter(filterListeners);
-    }
-	
-    emit(name, data) {
-        if (!this._events[name]) {
-            throw new Error(`Can't emit an event. Event "${name}" doesn't exits.`);
-        }
-        const fireCallbacks = (callback) => {
-            callback(data);
-        };
-        this._events[name].forEach(fireCallbacks);
-    }
 }
 
 export default Node;
