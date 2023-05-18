@@ -17,6 +17,8 @@ import Tree from './tree';
 
 import Multiuser from './multiuser';
 
+import qrCodeUrl from '../../images/qrcode.png';
+
 function sketch(p) {
     var tree;
     var graphics;
@@ -28,7 +30,13 @@ function sketch(p) {
     const loopInFrames = 240;
     
     var isServer;
+    var qrCode;
+    var qrCodeImage;
     var multiuser;
+
+    p.preload = function() {
+        qrCodeImage = p.loadImage(qrCodeUrl);
+    }
         
     p.setup = function() {
         var parent = this.canvas.parentElement;
@@ -48,6 +56,7 @@ function sketch(p) {
         const queryString = window.location.search;
         const urlParams = new URLSearchParams(queryString);
         isServer = urlParams.get("server") === "1";
+        qrCode = urlParams.get("qrcode") === "1";
         
         if(useSound){
             for(var i = 0; i < maxSound; i++){
@@ -69,6 +78,11 @@ function sketch(p) {
         if (p.frameCount % loopInFrames === 0 || p.frameCount === 1) {
             tree.pulse();
         }
+
+        if(qrCode){
+            const s = 4;
+            p.image(qrCodeImage, 300, p.height-qrCodeImage.height/s-100, qrCodeImage.width/s, qrCodeImage.height/s);
+        }
     }
 
     function onTreeAdd(data){
@@ -80,7 +94,7 @@ function sketch(p) {
     }
 
     function onTreePulse(data){
-        const scale = [60, 62, 64, 66, 69, 70];//C, D, E, F♯, G, A, B♭
+        const scale = [0, 1, 2, 3, 4, 5, 6, 7];//C, D, E, F♯, G, A, B♭
         var angle = 0;
         if(data.parent){
             angle =  Math.atan2(data.parent.pos.y - data.pos.y, data.parent.pos.x - data.pos.x);
@@ -91,7 +105,7 @@ function sketch(p) {
         let freqValue = p.midiToFreq(midiValue);
         
         if(isServer)
-            multiuser.publish(freqValue.toString());
+            multiuser.publish(scale[note].toString());
 
         if(useSound){
             oscs[soundCounter].freq(freqValue);
